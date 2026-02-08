@@ -38,7 +38,7 @@ namespace LogViewer
         private void SetupPolling()
         {
             _pollTimer = new DispatcherTimer();
-            _pollTimer.Interval = TimeSpan.FromMilliseconds(500);
+            _pollTimer.Interval = TimeSpan.FromMilliseconds(100);
             _pollTimer.Tick += (s, e) => ReadFile();
             _pollTimer.Start();
         }
@@ -69,7 +69,9 @@ namespace LogViewer
 
         private void ReadFile()
         {
-            lock (_lockObj)
+            if (!lockObj_Acquired()) return;
+
+            try
             {
                 if (!File.Exists(_filePath))
                 {
@@ -82,51 +84,67 @@ namespace LogViewer
                     return;
                 }
 
-                try
+                // Use FileShare.ReadWrite to allow other processes to write to the file
+                using (var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
-                    // Use FileShare.ReadWrite to allow the game to still write to the file
-                    using (var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    if (fs.Length < _lastPosition)
                     {
-                        if (fs.Length < _lastPosition)
-                        {
-                            Console.WriteLine($"[LogReader] File truncated: OldPos={_lastPosition}, NewLen={fs.Length}");
-                            // File was reset or truncated
-                            _lastPosition = 0;
-                            RunOnUiThread(() => LogEntries.Clear());
-                        }
+                        Console.WriteLine($"[LogReader] File truncated: OldPos={_lastPosition}, NewLen={fs.Length}");
+                        _lastPosition = 0;
+                        RunOnUiThread(() => LogEntries.Clear());
+                    }
 
-                        if (fs.Length == _lastPosition)
-                        {
-                            return; // No new data
-                        }
+                    if (fs.Length == _lastPosition)
+                    {
+                        return; // No new data
+                    }
 
-                        fs.Seek(_lastPosition, SeekOrigin.Begin);
+                    fs.Seek(_lastPosition, SeekOrigin.Begin);
 
-                        using (var sr = new StreamReader(fs, Encoding.UTF8))
+                    var newEntries = new System.Collections.Generic.List<LogEntry>();
+                    using (var sr = new StreamReader(fs, Encoding.UTF8))
+                    {
+                        while (!sr.EndOfStream)
                         {
-                            while (!sr.EndOfStream)
+                            string line = sr.ReadLine();
+                            if (line != null)
                             {
-                                string line = sr.ReadLine();
-                                if (line != null)
-                                {
-                                    RunOnUiThread(() => LogEntries.Add(new LogEntry { Content = line }));
-                                }
+                                newEntries.Add(new LogEntry { Content = line });
                             }
-                            _lastPosition = fs.Position;
                         }
+                        _lastPosition = fs.Position;
+                    }
+
+                    if (newEntries.Count > 0)
+                    {
+                        RunOnUiThread(() => 
+                        {
+                            foreach (var entry in newEntries)
+                            {
+                                LogEntries.Add(entry);
+                            }
+                        });
                     }
                 }
-                catch (IOException)
-                {
-                    // File might be used by another process, will retry next poll or event
-                }
-                catch (Exception ex)
-                {
-                     Console.WriteLine($"[LogReader] Error reading file: {ex.Message}");
-                }
+            }
+            catch (IOException)
+            {
+                // File might be used by another process, will retry next poll or event
+            }
+            catch (Exception ex)
+            {
+                 Console.WriteLine($"[LogReader] Error reading file: {ex.Message}");
+            }
+            finally
+            {
+                System.Threading.Monitor.Exit(_lockObj);
             }
         }
 
+        private bool lockObj_Acquired()
+        {
+            return System.Threading.Monitor.TryEnter(_lockObj);
+        }
 
         private object _lockObj = new object();
 
@@ -137,7 +155,7 @@ namespace LogViewer
                 if (_uiDispatcher.CheckAccess())
                     action();
                 else
-                    _uiDispatcher.BeginInvoke(action);
+                    _uiDispatcher.BeginInvoke(action, DispatcherPriority.Normal);
             }
             else
             {
