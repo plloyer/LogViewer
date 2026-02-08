@@ -1,0 +1,17 @@
+# Visual Studio
+.vs/
+[Bb]in/
+[Oo]bj/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+# Dotnet
+*.log
+settings.json
+test_log.txt
+
+# OS
+.DS_Store
+Thumbs.db

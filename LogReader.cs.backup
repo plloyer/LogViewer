@@ -1,0 +1,112 @@
+using System;
+using System.Collections.ObjectModel;
+using System.IO;
+using System.Text;
+using System.Windows.Threading;
+
+namespace LogViewer
+{
+    public class LogEntry
+    {
+        public string Content { get; set; } = string.Empty;
+    }
+
+    public class LogReader
+    {
+        private string _filePath;
+        private long _lastPosition = 0;
+        private FileSystemWatcher _watcher;
+        private Dispatcher _uiDispatcher;
+
+        public ObservableCollection<LogEntry> LogEntries { get; private set; } = new ObservableCollection<LogEntry>();
+
+        public LogReader(string filePath)
+        {
+            _filePath = filePath;
+            _uiDispatcher = Dispatcher.CurrentDispatcher;
+
+            if (File.Exists(_filePath))
+            {
+                ReadFile();
+            }
+
+            SetupWatcher();
+        }
+
+        private void SetupWatcher()
+        {
+            string directory = Path.GetDirectoryName(_filePath);
+            if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
+            {
+                // Directory doesn't exist, maybe we are waiting for it to be created?
+                // For now, let's just return to avoid crashing.
+                return;
+            }
+
+            string fileName = Path.GetFileName(_filePath);
+
+            _watcher = new FileSystemWatcher(directory);
+            _watcher.Filter = fileName;
+            _watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName;
+            _watcher.Changed += OnChanged;
+            _watcher.Created += OnChanged; // Handle file creation
+            _watcher.EnableRaisingEvents = true;
+        }
+
+        private void OnChanged(object sender, FileSystemEventArgs e)
+        {
+             // Debounce or just read. FileSystemWatcher can fire multiple times.
+             ReadFile();
+        }
+
+        private void ReadFile()
+        {
+            if (!File.Exists(_filePath)) return;
+
+            try
+            {
+                using (var fs = new FileStream(_filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    if (fs.Length < _lastPosition)
+                    {
+                        // File was reset
+                        _lastPosition = 0;
+                        RunOnUiThread(() => LogEntries.Clear());
+                    }
+
+                    fs.Seek(_lastPosition, SeekOrigin.Begin);
+
+                    using (var sr = new StreamReader(fs, Encoding.UTF8))
+                    {
+                        while (!sr.EndOfStream)
+                        {
+                            string line = sr.ReadLine();
+                            if (line != null)
+                            {
+                                RunOnUiThread(() => LogEntries.Add(new LogEntry { Content = line }));
+                            }
+                        }
+                    }
+
+                    _lastPosition = fs.Position;
+                }
+            }
+            catch (Exception)
+            {
+                // File might be locked briefly, or other IO errors. 
+            }
+        }
+
+        private void RunOnUiThread(Action action)
+        {
+            if (_uiDispatcher != null)
+            {
+                _uiDispatcher.Invoke(action);
+            }
+            else
+            {
+                action();
+            }
+        }
+    }
+}
