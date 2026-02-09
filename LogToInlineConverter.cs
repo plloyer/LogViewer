@@ -21,6 +21,7 @@ namespace LogViewer
         private static Brush _colorKnights;
         
         private static Brush _colorAutoStart;
+        private static Brush _colorSpectator;
         
         static LogToInlineConverter()
         {
@@ -34,6 +35,7 @@ namespace LogViewer
                 _colorSpent = GetBrushFromHex("#E65100"); // Dark-ish orange
                 _colorKnights = GetBrushFromHex("#B388FF"); // Semi-light purple
                 _colorAutoStart = GetBrushFromHex("#607D8B"); // Muted blue-gray
+                _colorSpectator = GetBrushFromHex("#00BCD4"); // Cyan
             }
             catch { }
         }
@@ -129,6 +131,7 @@ namespace LogViewer
             if (tag.Contains("SPENT", StringComparison.OrdinalIgnoreCase)) return _colorSpent ?? Brushes.DarkOrange;
             if (tag.Contains("Knights", StringComparison.OrdinalIgnoreCase)) return _colorKnights ?? Brushes.MediumPurple;
             if (tag.Contains("AutoStart", StringComparison.OrdinalIgnoreCase)) return _colorAutoStart ?? Brushes.SlateGray;
+            if (tag.Contains("Spectator", StringComparison.OrdinalIgnoreCase)) return _colorSpectator ?? Brushes.Cyan;
 
             return Brushes.Gray;
         }
