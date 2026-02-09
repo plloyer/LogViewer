@@ -40,12 +40,13 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Text="Strip Start:" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <TextBlock Text="Strip Start (;) :" Foreground="Gray" VerticalAlignment="Center" Margin="0,0,10,0"/>
             <TextBox x:Name="StripPrefixTextBox" 
                      Grid.Column="1"
                      Padding="5" 
                      TextChanged="StripPrefixTextBox_TextChanged"
                      Text="[Info   :AI Overhaul] [AI-Mod]"
+                     Tag="Strip multiple prefixes (separate by ;)"
                      FontSize="14"
                      Background="#333333"
                      Foreground="White"

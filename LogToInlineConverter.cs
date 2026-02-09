@@ -62,12 +62,20 @@ namespace LogViewer
                 if (values.Length < 1 || values[0] is not string text || string.IsNullOrEmpty(text))
                     return null;
 
-                string stripPrefix = values.Length > 1 ? values[1] as string : null;
+                string stripPrefixInput = values.Length > 1 ? values[1] as string : null;
 
-                // Strip prefix if present
-                if (!string.IsNullOrEmpty(stripPrefix) && text.StartsWith(stripPrefix, StringComparison.OrdinalIgnoreCase))
+                // Strip prefixes if present
+                if (!string.IsNullOrEmpty(stripPrefixInput))
                 {
-                    text = text.Substring(stripPrefix.Length).TrimStart();
+                    string[] prefixes = stripPrefixInput.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (var prefix in prefixes)
+                    {
+                        string trimmedPrefix = prefix.Trim();
+                        if (!string.IsNullOrEmpty(trimmedPrefix) && text.StartsWith(trimmedPrefix, StringComparison.OrdinalIgnoreCase))
+                        {
+                            text = text.Substring(trimmedPrefix.Length).TrimStart();
+                        }
+                    }
                 }
 
                 // Simple parsing logic
